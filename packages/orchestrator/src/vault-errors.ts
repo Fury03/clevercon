@@ -40,6 +40,8 @@ export enum VaultErrorCode {
   TaskNotDisputed = 23,
   ReleaseConflict = 24,
   TooManyStepReleases = 25,
+  FeeBpsExceedsCap = 26,
+  NoFeesAccrued = 27,
 }
 
 /**
