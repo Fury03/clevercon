@@ -36,6 +36,21 @@ export function OrchestratorProvider({ children }: { children: ReactNode }) {
       // an orchestrator registered on-chain. If so, proceed to the dashboard;
       // otherwise CreateOrchestrator registers one client-side (user-signed).
       setIsLoading(true);
+      const fromStore = (): OrchestratorInfo | null => {
+        const stored = localStorage.getItem(`clevercon_orchestrator_${publicKey}`);
+        if (!stored) return null;
+        try {
+          const r = JSON.parse(stored);
+          return {
+            name: r.orchestrator_name || 'Orchestrator',
+            pubkey: r.orchestrator_pubkey,
+            registered_on_chain: !!r.registered_on_chain,
+            system_prompt: r.system_prompt ?? null,
+          };
+        } catch {
+          return null;
+        }
+      };
       try {
         const cfg = await fetchUserConfig(publicKey);
         if (cfg && cfg.orchestrator) {
@@ -46,10 +61,12 @@ export function OrchestratorProvider({ children }: { children: ReactNode }) {
             system_prompt: null,
           });
         } else {
-          setOrchestrator(null);
+          // No on-chain orchestrator: fall back to a locally-stored one (e.g. a
+          // registration that just went through) before showing the create screen.
+          setOrchestrator(fromStore());
         }
       } catch {
-        setOrchestrator(null);
+        setOrchestrator(fromStore());
       } finally {
         setIsLoading(false);
       }
