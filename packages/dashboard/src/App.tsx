@@ -26,6 +26,7 @@ import { OrchestratorProvider, useOrchestrator } from './contexts/OrchestratorPr
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { ConnectWallet } from './components/ConnectWallet';
 import { CreateOrchestrator } from './components/CreateOrchestrator';
+import { Landing } from './components/Landing';
 import { useWebSocket } from './hooks/useWebSocket';
 import { fetchVaultAccount } from './lib/vault-client';
 import { submitTask, forceCompleteVaultTask } from './lib/api';
@@ -527,7 +528,24 @@ function AppInner() {
   return <Dashboard />;
 }
 
+const isAppRoute = () => {
+  const h = window.location.hash;
+  return h === '#app' || h === '#/app';
+};
+
 export default function App() {
+  const [inApp, setInApp] = useState(isAppRoute);
+
+  useEffect(() => {
+    const onHash = () => setInApp(isAppRoute());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  if (!inApp) {
+    return <Landing onLaunch={() => { window.location.hash = 'app'; window.scrollTo(0, 0); }} />;
+  }
+
   return (
     <WalletProvider>
       <OrchestratorProvider>
