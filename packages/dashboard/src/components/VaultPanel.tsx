@@ -3,7 +3,7 @@ import { Vault, ExternalLink, Plus, Minus, X, RefreshCw, Lock, CheckCircle } fro
 import { useWallet } from '../contexts/WalletProvider';
 import { fetchVaultAccount, buildDepositXdr, buildWithdrawXdr, submitVaultXdr, type VaultAccount } from '../lib/vault-client';
 
-const VAULT_CONTRACT_ID = 'CDFLEJ2HFPK3WKFTWB4CKP2JHEYNAUWKXGEJRYW4YMMGDSQSQ7D4LRTE';
+import { VAULT_CONTRACT_ID } from '../lib/config';
 const NETWORK_PASSPHRASE = 'Test SDF Network ; September 2015';
 const QUICK_AMOUNTS = [1, 5, 10, 20];
 

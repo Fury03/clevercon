@@ -1,35 +1,8 @@
 import { API_BASE, BACKEND_ENABLED, BackendOfflineError, HORIZON_URL, NETWORK_PASSPHRASE, USDC_ISSUER } from './config';
 import { Horizon, TransactionBuilder, Operation, Asset, BASE_FEE } from '@stellar/stellar-sdk';
+import { MOCK_AGENTS } from './mock-agents';
 
 const BASE = API_BASE; // '' = same origin (orchestrator serves API + dashboard)
-
-// Clearly-labeled placeholder services, shown ONLY when no registry backend is
-// connected (e.g. the temporary standalone Vercel demo). Real services still
-// register through the live registry exactly as before once the backend is on.
-const NULL_ADDR = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
-const now = () => new Date().toISOString();
-const MOCK_AGENTS = [
-  {
-    agent_id: 'demo-oracle', name: 'StellarOracle (demo)',
-    description: 'Placeholder shown while the registry backend is offline.',
-    capabilities: ['stellar-data', 'prices'],
-    pricing: { model: 'x402', price_per_call: 0.02, currency: 'USDC' },
-    endpoint: 'https://example.invalid/oracle', stellar_address: NULL_ADDR,
-    health_check: 'https://example.invalid/oracle/health',
-    registered_at: now(), last_seen: now(), status: 'inactive', is_mock: true,
-    reputation: { score: 90, total_jobs: 0, successful_jobs: 0, failed_jobs: 0, avg_quality: 0, avg_latency_ms: 0, last_updated: now() },
-  },
-  {
-    agent_id: 'demo-analysis', name: 'AnalysisBot (demo)',
-    description: 'Placeholder shown while the registry backend is offline.',
-    capabilities: ['analysis', 'reporting'],
-    pricing: { model: 'mpp', price_per_call: 0.05, currency: 'USDC' },
-    endpoint: 'https://example.invalid/analysis', stellar_address: NULL_ADDR,
-    health_check: 'https://example.invalid/analysis/health',
-    registered_at: now(), last_seen: now(), status: 'inactive', is_mock: true,
-    reputation: { score: 88, total_jobs: 0, successful_jobs: 0, failed_jobs: 0, avg_quality: 0, avg_latency_ms: 0, last_updated: now() },
-  },
-];
 
 export async function submitTask(task: string, budget: number, userAddress?: string) {
   if (!BACKEND_ENABLED) throw new BackendOfflineError();

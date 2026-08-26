@@ -5,7 +5,7 @@ interface Props {
   events: WSEvent[];
 }
 
-const VAULT_CONTRACT_ID = 'CDFLEJ2HFPK3WKFTWB4CKP2JHEYNAUWKXGEJRYW4YMMGDSQSQ7D4LRTE';
+import { VAULT_CONTRACT_ID } from '../lib/config';
 const EXPLORER_URL = `https://stellar.expert/explorer/testnet/contract/${VAULT_CONTRACT_ID}`;
 
 interface VaultState {

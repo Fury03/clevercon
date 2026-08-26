@@ -12,6 +12,9 @@ interface AgentRecord {
   name: string;
   description: string;
   capabilities: string[];
+  category?: string;
+  provider_type?: string;
+  is_mock?: boolean;
   pricing: { model: string; price_per_call: number; currency: string };
   endpoint: string;
   stellar_address: string;
@@ -38,6 +41,20 @@ const REP_FILTERS = [
   { label: '70+', min: 70 },
   { label: '90+', min: 90 },
 ];
+const SORTS = [
+  { key: 'score', label: 'Top rated' },
+  { key: 'jobs', label: 'Most used' },
+  { key: 'price-asc', label: 'Price: low to high' },
+  { key: 'price-desc', label: 'Price: high to low' },
+  { key: 'latency', label: 'Fastest' },
+  { key: 'name', label: 'Name A-Z' },
+];
+const PROVIDER_LABEL: Record<string, string> = { ai: 'AI agent', human: 'Human', business: 'Business' };
+function providerBadge(p?: string): string {
+  if (p === 'human') return 'bg-amber-950/60 border-amber-900/60 text-amber-400';
+  if (p === 'business') return 'bg-teal-950/60 border-teal-900/60 text-teal-400';
+  return 'bg-sky-950/60 border-sky-900/60 text-sky-400';
+}
 
 function scoreStyle(score: number): string {
   if (score >= 80) return 'text-emerald-400 bg-emerald-950/60 border-emerald-900';
@@ -171,6 +188,16 @@ function AgentCard({
                 <span className={`text-xs px-1.5 py-px rounded border leading-none uppercase font-medium ${modelBadge(agent.pricing.model)}`}>
                   {agent.pricing.model}
                 </span>
+                {agent.provider_type && (
+                  <span className={`text-xs px-1.5 py-px rounded border leading-none ${providerBadge(agent.provider_type)}`}>
+                    {PROVIDER_LABEL[agent.provider_type] ?? agent.provider_type}
+                  </span>
+                )}
+                {agent.category && (
+                  <span className="text-xs px-1.5 py-px rounded border border-gray-700 bg-gray-800/60 text-gray-400 leading-none">
+                    {agent.category}
+                  </span>
+                )}
               </div>
             )}
 
@@ -392,6 +419,8 @@ export function AgentsPage({ onRegisterClick }: Props) {
   const [search, setSearch] = useState('');
   const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [minRep, setMinRep] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState('score');
 
   const load = async () => {
     setLoading(true);
@@ -417,17 +446,34 @@ export function AgentsPage({ onRegisterClick }: Props) {
     [agents, myAddresses],
   );
 
+  const categories = useMemo(
+    () => Array.from(new Set(agents.map(a => a.category).filter(Boolean))) as string[],
+    [agents],
+  );
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return agents.filter(a => {
+    const list = agents.filter(a => {
       if (q && !a.name.toLowerCase().includes(q) &&
               !a.description.toLowerCase().includes(q) &&
               !a.capabilities.some(c => c.toLowerCase().includes(q))) return false;
       if (modelFilter && a.pricing.model !== modelFilter) return false;
+      if (categoryFilter && a.category !== categoryFilter) return false;
       if ((a.reputation?.score ?? 0) < minRep) return false;
       return true;
     });
-  }, [agents, search, modelFilter, minRep]);
+    list.sort((a, b) => {
+      switch (sortBy) {
+        case 'price-asc': return a.pricing.price_per_call - b.pricing.price_per_call;
+        case 'price-desc': return b.pricing.price_per_call - a.pricing.price_per_call;
+        case 'jobs': return (b.reputation?.total_jobs ?? 0) - (a.reputation?.total_jobs ?? 0);
+        case 'latency': return (a.reputation?.avg_latency_ms ?? Infinity) - (b.reputation?.avg_latency_ms ?? Infinity);
+        case 'name': return a.name.localeCompare(b.name);
+        default: return (b.reputation?.score ?? 0) - (a.reputation?.score ?? 0);
+      }
+    });
+    return list;
+  }, [agents, search, modelFilter, minRep, categoryFilter, sortBy]);
 
   const otherAgents = useMemo(
     () => filtered.filter(a => !isMineCheck(a)),
@@ -444,6 +490,13 @@ export function AgentsPage({ onRegisterClick }: Props) {
 
   return (
     <div className="space-y-6">
+      {agents.some(a => a.is_mock) && (
+        <div className="bg-amber-950/30 border border-amber-900/50 rounded-xl px-4 py-2.5">
+          <p className="text-xs text-amber-300/90 leading-relaxed">
+            <span className="font-semibold text-amber-300">Sample data.</span> These are example services showing the kind of AI agents, human specialists, and business services that can register on CleverCon. They are not live and cannot be hired yet: the registry backend is offline in this demo.
+          </p>
+        </div>
+      )}
       {/* Search + filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
         <div className="relative flex-1 max-w-sm">
@@ -477,11 +530,30 @@ export function AgentsPage({ onRegisterClick }: Props) {
                 }`}>{f.label}</button>
             ))}
           </div>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+            className="text-xs bg-gray-900 border border-gray-800 rounded-lg px-2 py-1.5 text-gray-400 outline-none focus:border-purple-600/50 cursor-pointer">
+            {SORTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
           <button onClick={load} className="p-1.5 rounded-lg text-gray-600 hover:text-gray-400 hover:bg-gray-800 transition-all">
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
+
+      {categories.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button onClick={() => setCategoryFilter(null)}
+            className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${categoryFilter === null ? 'bg-gray-800 border-gray-600 text-gray-200' : 'bg-gray-900 border-gray-800 text-gray-600 hover:text-gray-300 hover:border-gray-700'}`}>
+            All
+          </button>
+          {categories.map(c => (
+            <button key={c} onClick={() => setCategoryFilter(categoryFilter === c ? null : c)}
+              className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${categoryFilter === c ? 'bg-gray-800 border-gray-600 text-gray-200' : 'bg-gray-900 border-gray-800 text-gray-600 hover:text-gray-300 hover:border-gray-700'}`}>
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-12 gap-6 items-start">
         {/* Agent list */}

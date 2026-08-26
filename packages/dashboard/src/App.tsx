@@ -148,6 +148,14 @@ function Dashboard() {
   }, []);
 
   const doSubmit = useCallback(async (task: string, budget: number, queueItemId?: string) => {
+    if (!BACKEND_ENABLED) {
+      addToast(
+        `${orchestrator?.name ?? 'The orchestrator'} is temporarily offline. Your request could not be dispatched right now, please try again later.`,
+        'warning',
+      );
+      if (queueItemId) advanceQueue(queueItemId, 'Orchestrator offline');
+      return;
+    }
     setIsRunning(true);
     setHasResult(false);
     setStuckDismissed(false);
@@ -166,7 +174,7 @@ function Dashboard() {
       setLastProgressAt(null);
       if (queueItemId) advanceQueue(queueItemId, 'Task submission failed');
     }
-  }, [publicKey, clearEvents, addToast, advanceQueue]);
+  }, [publicKey, clearEvents, addToast, advanceQueue, orchestrator]);
 
   // Stable ref so the countdown interval always calls the latest doSubmit / advanceQueue / addToast
   const queueTickRef = useRef<() => void>(() => {});
