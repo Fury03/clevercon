@@ -2,34 +2,47 @@
 
 # CleverCon
 
-**Delegate a budget to AI agents on Stellar. Funds stay in a contract that enforces the limit.**
+**The payment rail AI agents spend through on Stellar. Bounded by default, private by design.**
 
 [![CI](https://github.com/clevercon-protocol/clevercon/actions/workflows/ci.yml/badge.svg)](https://github.com/clevercon-protocol/clevercon/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Network](https://img.shields.io/badge/Network-Stellar%20Testnet-7B2FFF)](https://stellar.expert/explorer/testnet)
 [![CleverVault](https://img.shields.io/badge/CleverVault-Deployed-00C853)](https://stellar.expert/explorer/testnet/contract/CDFLEJ2HFPK3WKFTWB4CKP2JHEYNAUWKXGEJRYW4YMMGDSQSQ7D4LRTE)
 
-[Live Demo](https://clevercon-orchestrator.onrender.com) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
 ## What it is
 
-CleverCon completes tasks on Stellar by hiring AI agents and paying them in USDC, without handing any of them custody of your money.
+CleverCon is payment infrastructure for AI agents on Stellar. It lets you hand an agent a budget it can spend on its own, while a smart contract holds the money and enforces the rules. The agent can pay for the data, compute, and services it needs to do real work, but it never holds your funds and never spends outside what you allowed.
 
-You deposit USDC into CleverVault, a Soroban contract, and submit a task in plain English. An orchestrator splits the task into steps, picks a specialist agent for each from an open registry, and releases payment from the vault as each step completes. The contract caps total spend at the budget you approved and refunds whatever is left. The operator never holds your funds.
+You deposit USDC into CleverVault, a non-custodial Soroban contract, and set a spending budget. The agent pays for services in USDC as it works, the contract caps the total at what you approved, and unused budget is refunded. The operator never touches your money, and every payment is a real Stellar transaction.
 
-Agents are paid over x402 (per-call micropayments) or MPP (streaming sessions). The registry is open, so any HTTP service with a Stellar wallet and x402 or MPP support can register and earn. The network is not limited to AI agents.
+The direction the project is built toward is privacy. Most agent-payment tools put your budget, your approved payees, and every payment on a public ledger for anyone to read. CleverCon is designed so the enforcement stays on-chain while the rules stay yours: a spending policy the contract checks without revealing it, and a proof that spending followed the policy without exposing the amounts or counterparties. That work builds on the zero-knowledge engine that already runs on Stellar testnet as [CipherMit](https://github.com/Bosun-Josh121/ciphermit).
 
 ## How it works
 
 1. Connect a wallet and deposit USDC into CleverVault.
-2. Submit a task. The orchestrator checks that it is feasible and builds a plan.
-3. Review the plan and approve it. The vault locks the budget on-chain.
-4. The executor runs the steps in order, releasing payment per step and paying each agent.
-5. When the task finishes, the vault refunds the unused budget.
+2. Describe what you want done and set a budget.
+3. An orchestrator plans the work and pays specialist services in USDC as each step completes, always within your budget.
+4. The vault caps spending at the budget and refunds the rest. You can withdraw anytime.
 
 The full fund-flow sequence and trust model are in [docs/architecture.md](docs/architecture.md).
+
+## What runs today
+
+- **CleverVault**, a non-custodial Soroban contract on testnet: deposits, budget locking, per-step release, refunds, multi-asset support, and admin controls, with a 100+ case test suite.
+- **Direct on-chain interaction from the browser**: connect a wallet, add a USDC trustline, deposit, check balance, and withdraw, all signed in your wallet and settled against the contract with no server in the middle.
+- **Orchestrator and open registry**: an orchestrator that plans work and hires specialist services, and a registry any HTTP service with a Stellar wallet and x402 or MPP support can join.
+- **x402 and MPP payments** to specialist services.
+- Placed 2nd in the Stellar Agents hackathon.
+
+## Where it is going
+
+- **Private spending policies**: a spending rule the contract enforces on every payment without making the rule public, using zero-knowledge proofs, built on the CipherMit engine.
+- **Provable compliance**: a proof that all spending followed the policy, shareable with an auditor or partner without revealing the policy.
+- **An on-chain registry**, a **Stellar MCP server** so any agent can pay for services under a policy, and a **reusable SDK**.
 
 ## Project structure
 
@@ -40,18 +53,12 @@ clevercon/
 │   └── budget-guardian/       earlier budget-tracking contract (legacy, unused)
 ├── packages/
 │   ├── common/                shared TypeScript types, constants, wallet helpers
-│   ├── registry/              agent discovery and reputation API
+│   ├── registry/              service discovery and reputation API
 │   ├── orchestrator/          planner, executor, vault client, WebSocket hub
 │   ├── dashboard/             React 19 + Vite + Tailwind frontend
-│   └── agents/
-│       ├── stellar-oracle/    live Stellar/Horizon data (x402)
-│       ├── web-intel/         news scraping v1 (x402)
-│       ├── web-intel-v2/      news scraping v2, cheaper (x402)
-│       ├── analysis/          LLM-powered analysis, streaming (MPP)
-│       └── reporter/          report formatting (x402)
+│   └── agents/                reference specialist services (oracle, web-intel, analysis, reporter)
 ├── scripts/                   setup, wallet, and lifecycle scripts
-├── docs/                      architecture and development docs
-└── render.yaml                Render deployment blueprint (7 services)
+└── docs/                      architecture and development docs
 ```
 
 ## Tech stack
@@ -59,66 +66,43 @@ clevercon/
 | Layer | Technology |
 |---|---|
 | Smart contract | Rust / Soroban (CleverVault) |
+| Zero-knowledge (direction) | RISC Zero and Noir circuits, verified on-chain, from the CipherMit engine |
+| Frontend | React 19, Vite, Tailwind CSS, direct Soroban and Horizon calls |
 | Backend | Node.js 20, Express, TypeScript (npm workspaces) |
-| Frontend | React 19, Vite, Tailwind CSS |
-| Planning | Claude Sonnet (planning), Claude Haiku (rating) |
 | Payments | `@x402/express`, `@x402/stellar`, `@stellar/mpp` |
 | Wallets | `@creit.tech/stellar-wallets-kit` (Freighter, xBull, Albedo, LOBSTR, Rabet) |
-| Chain data | Stellar Horizon API |
-| Deployment | Render.com |
+| Chain access | `@stellar/stellar-sdk`, Horizon, Soroban RPC |
 
 ## Quick start
 
 ### Prerequisites
 
 - Node.js 20+ (see `.nvmrc`)
-- An Anthropic API key
-- Freighter browser extension, set to testnet
+- Freighter (or another supported wallet) set to testnet
+- An Anthropic API key, only if you run the orchestrator locally
 
-### 1. Clone and install
+### Install and run the dashboard
 
 ```bash
 git clone https://github.com/clevercon-protocol/clevercon.git
 cd clevercon
 npm install
+cd packages/dashboard
+npm run dev
 ```
 
-### 2. Configure
+The dashboard talks to the contract directly, so wallet connect, the USDC trustline, and vault deposit, balance, and withdraw work on testnet without any backend. To run the full stack (orchestrator, registry, and the reference services), see [docs/development.md](docs/development.md).
 
-```bash
-cp .env.example .env
-# Add your ANTHROPIC_API_KEY
-```
+## Deploying the dashboard (Vercel)
 
-### 3. Set up wallets (first time only)
+The dashboard is a static site and deploys on Vercel free:
 
-```bash
-npx tsx scripts/setup-wallets.ts         # generate keypairs, print *_SECRET_KEY lines
-# copy the printed *_SECRET_KEY=S... lines into .env before continuing
-npx tsx scripts/add-usdc-trustlines.ts   # add USDC trustlines to every wallet
-npx tsx scripts/fund-testnet-usdc.ts     # swap XLM to USDC via the testnet DEX
-npx tsx scripts/distribute-usdc.ts       # send USDC from orchestrator to each agent wallet
-```
+1. Create a Vercel project from this repo.
+2. Set the Root Directory to `packages/dashboard`.
+3. Add the env var `VITE_BACKEND_ENABLED=false` for a standalone build (wallet and contract interactions stay real; orchestrator-backed features show a placeholder).
+4. Build and output settings come from `packages/dashboard/vercel.json`.
 
-### 4. Start all services
-
-```bash
-./scripts/start.sh
-```
-
-This builds the dashboard, starts the registry, all five agents, and the orchestrator, and health-checks each one. Open `http://localhost:3000`, connect Freighter on testnet, and submit a task.
-
-### 5. Stop
-
-```bash
-./scripts/stop.sh
-```
-
-### Optional: seed reputation data
-
-```bash
-npx tsx scripts/bootstrap.ts --auto-approve   # runs 25 varied tasks to build agent history
-```
+To point the dashboard at a running backend later, set `VITE_API_URL` and `VITE_WS_URL` and set `VITE_BACKEND_ENABLED=true`.
 
 ## Deploying the CleverVault contract
 
@@ -130,45 +114,12 @@ cd contracts/agent-vault && ./deploy.sh
 
 This builds to WASM, deploys, initializes, runs a smoke test, and writes `AGENT_VAULT_CONTRACT_ID` to `.env`.
 
-## Deploying to Render
-
-`render.yaml` defines all 7 services (registry, orchestrator + dashboard, and 5 agents). Push to GitHub and create a Blueprint from this repo in Render. After the first deploy, update `*_SELF_URL` and `REGISTRY_URL` to the assigned `.onrender.com` URLs and redeploy. Agents re-register on startup.
-
-## Environment variables
-
-See [.env.example](.env.example) for the full list. The essentials:
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-...        # required
-ORCHESTRATOR_SECRET_KEY=S...        # generated by setup-wallets.ts
-AGENT_VAULT_CONTRACT_ID=C...        # written by deploy.sh
-STELLAR_NETWORK=stellar:testnet
-HORIZON_URL=https://horizon-testnet.stellar.org
-```
-
-## Reference agents (testnet)
-
-| Agent | Protocol | Price | Description |
-|---|---|---|---|
-| StellarOracle | x402 | $0.020 | Live Horizon data, DEX spreads, orderbooks, network stats |
-| WebIntel v1 | x402 | $0.020 | Web scraping with LLM summarization |
-| WebIntel v2 | x402 | $0.015 | Cheaper alternative, returns raw JSON |
-| AnalysisBot | MPP | $0.050 | Deep analysis over a streaming payment channel |
-| ReporterBot | x402 | $0.030 | Formats data into executive reports |
-
-These five are reference implementations that demonstrate the marketplace. The registry is open: any HTTP service with x402 or MPP support can register and earn. See [docs/development.md](docs/development.md) for the agent interface.
-
 ## Deployments
 
 | Component | Network | Address |
 |---|---|---|
 | CleverVault | Stellar Testnet | [`CDFLEJ2H...D4LRTE`](https://stellar.expert/explorer/testnet/contract/CDFLEJ2HFPK3WKFTWB4CKP2JHEYNAUWKXGEJRYW4YMMGDSQSQ7D4LRTE) |
 | USDC (SAC) | Stellar Testnet | [`CBIELTK6...HMXQDAMA`](https://stellar.expert/explorer/testnet/contract/CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA) |
-| Orchestrator + Dashboard | Render | https://clevercon-orchestrator.onrender.com |
-
-## Roadmap
-
-Near-term work focuses on private spending policies (a spending rule set by the user and enforced on-chain without revealing it), an on-chain agent registry, a Stellar MCP server, and a reusable agent SDK. See [ROADMAP.md](ROADMAP.md).
 
 ## Documentation
 

@@ -2,13 +2,18 @@
 
 ## Vision
 
-CleverCon is a way to delegate a budget to AI agents on Stellar without giving
-up custody. Funds sit in a non-custodial Soroban vault, an orchestrator hires
-agents by capability, and payment settles in USDC per task step. The vault caps
-what can be spent and refunds the rest.
+CleverCon is the payment rail AI agents spend through on Stellar. You hand an
+agent a budget, a non-custodial Soroban vault holds the money and enforces the
+limit, and the agent pays for the services it needs in USDC without ever holding
+your funds or spending outside what you allowed.
 
-The current agent network is AI-focused, but the protocol is not tied to AI. Any
-HTTP service with a Stellar wallet and x402 or MPP support can register.
+The direction the project is built toward is privacy. Today the vault enforces a
+budget in the open. The work ahead is a spending policy the contract enforces
+without making it public, and a proof that spending followed the policy without
+revealing it, built on the CipherMit zero-knowledge engine.
+
+The current service network is AI-focused, but the protocol is not tied to AI.
+Any HTTP service with a Stellar wallet and x402 or MPP support can register.
 
 The direction the project is heading is private spending policies: the user sets
 a spending rule (a cap, an allowlist of payees, a per-payment limit), the vault

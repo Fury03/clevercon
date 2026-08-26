@@ -1,6 +1,38 @@
-const BASE = '';  // Same origin — orchestrator serves both API and dashboard
+import { API_BASE, BACKEND_ENABLED, BackendOfflineError, HORIZON_URL, NETWORK_PASSPHRASE, USDC_ISSUER } from './config';
+import { Horizon, TransactionBuilder, Operation, Asset, BASE_FEE } from '@stellar/stellar-sdk';
+
+const BASE = API_BASE; // '' = same origin (orchestrator serves API + dashboard)
+
+// Clearly-labeled placeholder services, shown ONLY when no registry backend is
+// connected (e.g. the temporary standalone Vercel demo). Real services still
+// register through the live registry exactly as before once the backend is on.
+const NULL_ADDR = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
+const now = () => new Date().toISOString();
+const MOCK_AGENTS = [
+  {
+    agent_id: 'demo-oracle', name: 'StellarOracle (demo)',
+    description: 'Placeholder shown while the registry backend is offline.',
+    capabilities: ['stellar-data', 'prices'],
+    pricing: { model: 'x402', price_per_call: 0.02, currency: 'USDC' },
+    endpoint: 'https://example.invalid/oracle', stellar_address: NULL_ADDR,
+    health_check: 'https://example.invalid/oracle/health',
+    registered_at: now(), last_seen: now(), status: 'new', is_mock: true,
+    reputation: { score: 90, total_jobs: 0, successful_jobs: 0, failed_jobs: 0, avg_quality: 0, avg_latency_ms: 0, last_updated: now() },
+  },
+  {
+    agent_id: 'demo-analysis', name: 'AnalysisBot (demo)',
+    description: 'Placeholder shown while the registry backend is offline.',
+    capabilities: ['analysis', 'reporting'],
+    pricing: { model: 'mpp', price_per_call: 0.05, currency: 'USDC' },
+    endpoint: 'https://example.invalid/analysis', stellar_address: NULL_ADDR,
+    health_check: 'https://example.invalid/analysis/health',
+    registered_at: now(), last_seen: now(), status: 'new', is_mock: true,
+    reputation: { score: 88, total_jobs: 0, successful_jobs: 0, failed_jobs: 0, avg_quality: 0, avg_latency_ms: 0, last_updated: now() },
+  },
+];
 
 export async function submitTask(task: string, budget: number, userAddress?: string) {
+  if (!BACKEND_ENABLED) throw new BackendOfflineError();
   const res = await fetch(`${BASE}/api/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -10,6 +42,7 @@ export async function submitTask(task: string, budget: number, userAddress?: str
 }
 
 export async function fetchAgents() {
+  if (!BACKEND_ENABLED) return MOCK_AGENTS;
   const res = await fetch(`${BASE}/api/agents`);
   const data = await res.json();
   return data.agents ?? [];
@@ -31,25 +64,25 @@ export async function rejectTask(task_id: string) {
 }
 
 export async function fetchUsdcTrustlineXdr(userAddress: string): Promise<string> {
-  const res = await fetch(`${BASE}/api/orchestrators/usdc-trustline`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_address: userAddress }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? 'Failed to build XDR');
-  return data.xdr;
+  // Built client-side: a classic changeTrust(USDC) transaction, no backend.
+  const horizon = new Horizon.Server(HORIZON_URL);
+  const account = await horizon.loadAccount(userAddress);
+  const tx = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(Operation.changeTrust({ asset: new Asset('USDC', USDC_ISSUER) }))
+    .setTimeout(300)
+    .build();
+  return tx.toXDR();
 }
 
 export async function submitUsdcTrustlineXdr(signedXdr: string): Promise<string> {
-  const res = await fetch(`${BASE}/api/orchestrators/usdc-trustline/confirm`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ signed_xdr: signedXdr }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? 'Failed to submit');
-  return data.tx_hash;
+  // Submitted client-side via Horizon, no backend.
+  const horizon = new Horizon.Server(HORIZON_URL);
+  const tx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+  const res = await horizon.submitTransaction(tx);
+  return res.hash;
 }
 
 export async function registerAgent(manifest: any) {
@@ -63,6 +96,7 @@ export async function registerAgent(manifest: any) {
 
 // U7: Activity log
 export async function fetchActivity(userAddress: string) {
+  if (!BACKEND_ENABLED) return [];
   const res = await fetch(`${BASE}/api/activity/${userAddress}`);
   const data = await res.json();
   return data.events ?? [];
@@ -70,6 +104,7 @@ export async function fetchActivity(userAddress: string) {
 
 // U7: Marketplace pulse
 export async function fetchPulse() {
+  if (!BACKEND_ENABLED) return {};
   const res = await fetch(`${BASE}/api/stats/pulse`);
   return res.json();
 }
@@ -124,6 +159,7 @@ export async function deleteAgent(agent_id: string, requester_address: string) {
 
 // Vault ledger — real vault transaction history
 export async function fetchVaultLedger(userAddress: string) {
+  if (!BACKEND_ENABLED) return [];
   const res = await fetch(`${BASE}/api/vault/ledger/${encodeURIComponent(userAddress)}`);
   const data = await res.json();
   return data.entries ?? [];
@@ -131,6 +167,7 @@ export async function fetchVaultLedger(userAddress: string) {
 
 // Task history — persisted results for History tab
 export async function fetchTaskHistory(userAddress: string) {
+  if (!BACKEND_ENABLED) return [];
   const res = await fetch(`${BASE}/api/tasks/history/${encodeURIComponent(userAddress)}`);
   const data = await res.json();
   return data.results ?? [];

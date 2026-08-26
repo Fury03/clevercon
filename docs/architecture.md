@@ -3,10 +3,11 @@
 How CleverCon's pieces fit together today, and where the architecture is headed
 per [ROADMAP.md](../ROADMAP.md).
 
-CleverCon lets a user delegate a budget to AI agents on Stellar. Funds sit in a
-non-custodial Soroban vault, an orchestrator hires agents and pays them per step,
-and the vault caps spending and refunds the rest. This document describes what
-runs today and marks planned work as such.
+CleverCon is the payment rail AI agents spend through on Stellar. You hand an
+agent a budget, a non-custodial Soroban vault holds the money and enforces the
+limit, and the agent pays for services in USDC per step. The privacy layer, a
+policy the contract enforces without revealing it, is the main work ahead. This
+document describes what runs today and marks planned work as such.
 
 ## System overview
 

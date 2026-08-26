@@ -1,3 +1,7 @@
+// Browser polyfill for @stellar/stellar-sdk (expects Node's Buffer global).
+import { Buffer } from 'buffer'
+;(globalThis as any).Buffer = (globalThis as any).Buffer || Buffer
+
 import { StrictMode, Component, type ReactNode, type ErrorInfo } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

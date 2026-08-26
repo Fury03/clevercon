@@ -1,10 +1,30 @@
 /**
- * Frontend CleverVault client.
- * Calls backend API endpoints which proxy Soroban RPC calls.
- * All USDC amounts are in decimal (e.g. 1.5 = $1.50).
+ * Frontend CleverVault client — talks to the Soroban contract directly.
+ *
+ * Deposits, withdrawals, and balance reads run entirely in the browser against
+ * Soroban RPC: build + simulate here, sign in the connected wallet, submit here.
+ * No backend is required, so these stay real even on a static (Vercel) deploy.
+ * All USDC amounts are decimal (e.g. 1.5 = $1.50).
  */
 
-const BASE = '';
+import {
+  Contract,
+  rpc as SorobanRpc,
+  TransactionBuilder,
+  BASE_FEE,
+  nativeToScVal,
+  Address,
+  scValToNative,
+  xdr,
+} from '@stellar/stellar-sdk';
+import {
+  SOROBAN_RPC_URL,
+  VAULT_CONTRACT_ID,
+  USDC_SAC,
+  NETWORK_PASSPHRASE,
+} from './config';
+
+const STROOPS_PER_USDC = 10_000_000;
 
 export interface VaultAccount {
   balance: number;
@@ -15,59 +35,145 @@ export interface VaultAccount {
   active_tasks_count: number;
 }
 
-export async function fetchVaultAccount(userAddress: string): Promise<VaultAccount> {
-  const res = await fetch(`${BASE}/api/vault/account/${userAddress}`);
-  if (!res.ok) {
-    // 503 = transient RPC error — caller should keep last known balance
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? `HTTP ${res.status}`);
+function server() {
+  return new SorobanRpc.Server(SOROBAN_RPC_URL);
+}
+
+function usdcToStroops(usdc: number): bigint {
+  return BigInt(Math.round(usdc * STROOPS_PER_USDC));
+}
+
+function usdcAsset(): xdr.ScVal {
+  return new Address(USDC_SAC).toScVal();
+}
+
+function vault(): Contract {
+  return new Contract(VAULT_CONTRACT_ID);
+}
+
+/**
+ * Build + simulate a contract call, returning the assembled unsigned XDR for
+ * the connected wallet to sign.
+ */
+async function buildUnsignedXdr(
+  source: string,
+  method: string,
+  args: xdr.ScVal[],
+): Promise<string> {
+  const s = server();
+  const account = await s.getAccount(source);
+  const tx = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(vault().call(method, ...args))
+    .setTimeout(300)
+    .build();
+
+  const sim = await s.simulateTransaction(tx);
+  if (SorobanRpc.Api.isSimulationError(sim)) {
+    throw new Error(sim.error || 'Simulation failed');
   }
-  return res.json();
+  return SorobanRpc.assembleTransaction(tx, sim).build().toXDR();
+}
+
+/** Read-only view call: simulate against a throwaway source, no signing. */
+async function callView(method: string, args: xdr.ScVal[]): Promise<any> {
+  const s = server();
+  const source = {
+    accountId: () => 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+    sequenceNumber: () => '0',
+    incrementSequenceNumber: () => {},
+  } as any;
+  const tx = new TransactionBuilder(source, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(vault().call(method, ...args))
+    .setTimeout(30)
+    .build();
+
+  const sim = await s.simulateTransaction(tx);
+  if (SorobanRpc.Api.isSimulationError(sim)) return null;
+  if (!('result' in sim) || !sim.result) return null;
+  return scValToNative(sim.result.retval);
+}
+
+async function pollForConfirmation(hash: string): Promise<string> {
+  const s = server();
+  for (let i = 0; i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const r = await s.getTransaction(hash);
+    if (r.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) return hash;
+    if (r.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
+      throw new Error(`Transaction failed on-chain: ${hash}`);
+    }
+  }
+  throw new Error(`Transaction timed out: ${hash}`);
+}
+
+export async function fetchVaultAccount(userAddress: string): Promise<VaultAccount> {
+  const raw = await callView('get_account', [
+    new Address(userAddress).toScVal(),
+    usdcAsset(),
+  ]);
+  // Option::None from the contract → account not created yet → zeroed.
+  if (raw === null || raw === undefined) {
+    return {
+      balance: 0,
+      available: 0,
+      locked: 0,
+      total_deposited: 0,
+      total_spent: 0,
+      active_tasks_count: 0,
+    };
+  }
+  const toUsdc = (v: bigint | number) => Number(v) / STROOPS_PER_USDC;
+  return {
+    balance: toUsdc(raw.balance),
+    available: toUsdc(raw.balance - raw.locked),
+    locked: toUsdc(raw.locked),
+    total_deposited: toUsdc(raw.total_deposited),
+    total_spent: toUsdc(raw.total_spent),
+    active_tasks_count: Number(raw.active_tasks_count),
+  };
 }
 
 export async function buildDepositXdr(userAddress: string, amount: number): Promise<string> {
-  const res = await fetch(`${BASE}/api/vault/deposit-xdr`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_address: userAddress, amount }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? 'Failed to build deposit XDR');
-  return data.xdr;
+  return buildUnsignedXdr(userAddress, 'deposit', [
+    new Address(userAddress).toScVal(),
+    usdcAsset(),
+    nativeToScVal(usdcToStroops(amount), { type: 'i128' }),
+  ]);
 }
 
 export async function buildWithdrawXdr(userAddress: string, amount: number): Promise<string> {
-  const res = await fetch(`${BASE}/api/vault/withdraw-xdr`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_address: userAddress, amount }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? 'Failed to build withdraw XDR');
-  return data.xdr;
+  return buildUnsignedXdr(userAddress, 'withdraw', [
+    new Address(userAddress).toScVal(),
+    usdcAsset(),
+    nativeToScVal(usdcToStroops(amount), { type: 'i128' }),
+  ]);
 }
 
 export async function submitVaultXdr(
   signedXdr: string,
-  meta?: { user_address: string; tx_type: 'deposit' | 'withdrawal'; amount: number },
+  _meta?: { user_address: string; tx_type: 'deposit' | 'withdrawal'; amount: number },
 ): Promise<string> {
-  const res = await fetch(`${BASE}/api/vault/submit`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ signed_xdr: signedXdr, ...meta }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? 'Transaction failed');
-  return data.tx_hash;
+  const s = server();
+  const tx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+  const resp = await s.sendTransaction(tx);
+  if (resp.status === 'ERROR') {
+    throw new Error('Transaction submission failed');
+  }
+  return pollForConfirmation(resp.hash);
 }
 
-export async function buildCancelTaskXdr(userAddress: string, vaultTaskId: number): Promise<string> {
-  const res = await fetch(`${BASE}/api/vault/cancel-task-xdr`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_address: userAddress, vault_task_id: vaultTaskId }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? 'Failed to build cancel XDR');
-  return data.xdr;
+export async function buildCancelTaskXdr(
+  userAddress: string,
+  vaultTaskId: number,
+): Promise<string> {
+  return buildUnsignedXdr(userAddress, 'cancel_task', [
+    new Address(userAddress).toScVal(),
+    nativeToScVal(BigInt(vaultTaskId), { type: 'u64' }),
+  ]);
 }

@@ -16,6 +16,10 @@ function removeCrossorigin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), removeCrossorigin()],
+  define: {
+    // @stellar/stellar-sdk and its deps reference `global` in a few places.
+    global: 'globalThis',
+  },
   build: {
     outDir: '../../packages/orchestrator/public',
     emptyOutDir: true,
