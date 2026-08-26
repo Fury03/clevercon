@@ -26,9 +26,15 @@ export function CreateOrchestrator() {
 
     try {
       if (!BACKEND_ENABLED) {
-        // Client-side registration: generate an orchestrator key, register it on
-        // the vault (the user signs the transaction), and store it locally.
+        // Client-side registration: generate an orchestrator key, fund it on
+        // testnet (the deployed contract expects the account to exist), register
+        // it on the vault (the user signs), and store it locally.
         const kp = Keypair.random();
+        try {
+          await fetch(`https://friendbot.stellar.org/?addr=${encodeURIComponent(kp.publicKey())}`);
+        } catch {
+          /* friendbot rate limit or already funded; proceed to registration */
+        }
         const xdr = await buildRegisterOrchestratorXdr(publicKey, kp.publicKey(), name.trim());
         setStep('signing');
         const signed = await signTransaction(xdr, 'Test SDF Network ; September 2015');
