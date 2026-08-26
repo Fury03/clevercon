@@ -177,3 +177,36 @@ export async function buildCancelTaskXdr(
     nativeToScVal(BigInt(vaultTaskId), { type: 'u64' }),
   ]);
 }
+
+export interface UserConfig {
+  orchestrator: string | null;
+  orchestrator_name: string;
+  active_tasks_count: number;
+}
+
+/**
+ * Read a wallet's vault config to see whether it already has an orchestrator
+ * registered on-chain. Returns null if the wallet has no vault config yet.
+ */
+export async function fetchUserConfig(userAddress: string): Promise<UserConfig | null> {
+  const raw = await callView('get_user_config', [new Address(userAddress).toScVal()]);
+  if (raw === null || raw === undefined) return null;
+  return {
+    orchestrator: raw.orchestrator ?? null,
+    orchestrator_name: raw.orchestrator_name ?? '',
+    active_tasks_count: Number(raw.active_tasks_count ?? 0),
+  };
+}
+
+/** Build an unsigned register_orchestrator XDR for the user to sign. */
+export async function buildRegisterOrchestratorXdr(
+  userAddress: string,
+  orchestratorAddress: string,
+  name: string,
+): Promise<string> {
+  return buildUnsignedXdr(userAddress, 'register_orchestrator', [
+    new Address(userAddress).toScVal(),
+    new Address(orchestratorAddress).toScVal(),
+    nativeToScVal(name, { type: 'string' }),
+  ]);
+}

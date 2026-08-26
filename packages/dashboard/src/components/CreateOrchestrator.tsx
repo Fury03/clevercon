@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Layers, Sparkles, ExternalLink, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useWallet } from '../contexts/WalletProvider';
 import { useOrchestrator } from '../contexts/OrchestratorProvider';
+import { Keypair } from '@stellar/stellar-sdk';
+import { BACKEND_ENABLED } from '../lib/config';
+import { buildRegisterOrchestratorXdr, submitVaultXdr } from '../lib/vault-client';
 
 const EXAMPLE_NAMES = ['Phoenix', 'Atlas', 'Sage', 'Nova', 'Orion', 'Ember'];
 
@@ -22,6 +25,32 @@ export function CreateOrchestrator() {
     setStep('creating');
 
     try {
+      if (!BACKEND_ENABLED) {
+        // Client-side registration: generate an orchestrator key, register it on
+        // the vault (the user signs the transaction), and store it locally.
+        const kp = Keypair.random();
+        const xdr = await buildRegisterOrchestratorXdr(publicKey, kp.publicKey(), name.trim());
+        setStep('signing');
+        const signed = await signTransaction(xdr, 'Test SDF Network ; September 2015');
+        await submitVaultXdr(signed);
+        localStorage.setItem(
+          `clevercon_orchestrator_${publicKey}`,
+          JSON.stringify({
+            user_address: publicKey,
+            orchestrator_pubkey: kp.publicKey(),
+            orchestrator_secret: kp.secret(),
+            orchestrator_name: name.trim(),
+            system_prompt: systemPrompt.trim() || null,
+            registered_on_chain: true,
+            created_at: new Date().toISOString(),
+          }),
+        );
+        setResult({ pubkey: kp.publicKey(), name: name.trim() });
+        setStep('success');
+        await refresh();
+        return;
+      }
+
       // 1. Ask server to create the orchestrator keypair + fund via Friendbot
       const createRes = await fetch('/api/orchestrators', {
         method: 'POST',

@@ -6,6 +6,8 @@
  */
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useWallet } from './WalletProvider';
+import { BACKEND_ENABLED } from '../lib/config';
+import { fetchUserConfig } from '../lib/vault-client';
 
 export interface OrchestratorInfo {
   name: string;
@@ -29,6 +31,30 @@ export function OrchestratorProvider({ children }: { children: ReactNode }) {
 
   const load = useCallback(async () => {
     if (!publicKey) { setIsLoading(false); return; }
+    if (!BACKEND_ENABLED) {
+      // Backendless: read the vault contract to see if this wallet already has
+      // an orchestrator registered on-chain. If so, proceed to the dashboard;
+      // otherwise CreateOrchestrator registers one client-side (user-signed).
+      setIsLoading(true);
+      try {
+        const cfg = await fetchUserConfig(publicKey);
+        if (cfg && cfg.orchestrator) {
+          setOrchestrator({
+            name: cfg.orchestrator_name || 'Orchestrator',
+            pubkey: cfg.orchestrator,
+            registered_on_chain: true,
+            system_prompt: null,
+          });
+        } else {
+          setOrchestrator(null);
+        }
+      } catch {
+        setOrchestrator(null);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await fetch(`/api/orchestrators/${encodeURIComponent(publicKey)}`);
