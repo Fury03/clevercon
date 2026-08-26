@@ -16,7 +16,7 @@ const MOCK_AGENTS = [
     pricing: { model: 'x402', price_per_call: 0.02, currency: 'USDC' },
     endpoint: 'https://example.invalid/oracle', stellar_address: NULL_ADDR,
     health_check: 'https://example.invalid/oracle/health',
-    registered_at: now(), last_seen: now(), status: 'new', is_mock: true,
+    registered_at: now(), last_seen: now(), status: 'inactive', is_mock: true,
     reputation: { score: 90, total_jobs: 0, successful_jobs: 0, failed_jobs: 0, avg_quality: 0, avg_latency_ms: 0, last_updated: now() },
   },
   {
@@ -26,7 +26,7 @@ const MOCK_AGENTS = [
     pricing: { model: 'mpp', price_per_call: 0.05, currency: 'USDC' },
     endpoint: 'https://example.invalid/analysis', stellar_address: NULL_ADDR,
     health_check: 'https://example.invalid/analysis/health',
-    registered_at: now(), last_seen: now(), status: 'new', is_mock: true,
+    registered_at: now(), last_seen: now(), status: 'inactive', is_mock: true,
     reputation: { score: 88, total_jobs: 0, successful_jobs: 0, failed_jobs: 0, avg_quality: 0, avg_latency_ms: 0, last_updated: now() },
   },
 ];
@@ -204,6 +204,7 @@ export interface AgentRecord {
 }
 
 export async function fetchOrchestratorHealth(signal: AbortSignal): Promise<boolean> {
+  if (!BACKEND_ENABLED) return false;
   try {
     const res = await fetch(`${BASE}/health`, { signal });
     return res.ok;
@@ -215,6 +216,7 @@ export async function fetchOrchestratorHealth(signal: AbortSignal): Promise<bool
 export async function fetchRegistryHealth(
   signal: AbortSignal,
 ): Promise<{ ok: boolean; agents: AgentRecord[] }> {
+  if (!BACKEND_ENABLED) return { ok: false, agents: [] };
   try {
     const res = await fetch(`${BASE}/api/agents`, { signal });
     if (!res.ok) return { ok: false, agents: [] };

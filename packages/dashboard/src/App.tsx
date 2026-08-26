@@ -29,6 +29,7 @@ import { CreateOrchestrator } from './components/CreateOrchestrator';
 import { useWebSocket } from './hooks/useWebSocket';
 import { fetchVaultAccount } from './lib/vault-client';
 import { submitTask, forceCompleteVaultTask } from './lib/api';
+import { BACKEND_ENABLED } from './lib/config';
 
 type Page = 'run' | 'financial' | 'agents' | 'history' | 'register';
 
@@ -100,7 +101,11 @@ function Dashboard() {
   const [stuckDismissed, setStuckDismissed] = useState(false);
   const stuckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
+  // No backend means no live activity socket; leave it empty so we do not
+  // open a doomed connection that just retries and shows a false red dot.
+  const WS_URL = BACKEND_ENABLED
+    ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`
+    : '';
   const { events, connected, clearEvents } = useWebSocket(WS_URL);
 
   // Vault balance poll

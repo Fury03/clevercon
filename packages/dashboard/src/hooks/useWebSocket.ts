@@ -13,6 +13,7 @@ export function useWebSocket(url: string) {
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
+    if (!url) { setConnected(false); return; }
     try {
       const ws = new WebSocket(url);
       wsRef.current = ws;

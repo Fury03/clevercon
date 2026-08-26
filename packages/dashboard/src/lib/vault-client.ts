@@ -77,15 +77,19 @@ async function buildUnsignedXdr(
   return SorobanRpc.assembleTransaction(tx, sim).build().toXDR();
 }
 
-/** Read-only view call: simulate against a throwaway source, no signing. */
-async function callView(method: string, args: xdr.ScVal[]): Promise<any> {
+/**
+ * Read-only view call: simulate against the given source account, no signing.
+ * `source` must be a real, existing account (the connected wallet), otherwise
+ * the SDK rejects it and the read fails.
+ */
+async function callView(method: string, args: xdr.ScVal[], source: string): Promise<any> {
   const s = server();
-  const source = {
-    accountId: () => 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+  const src = {
+    accountId: () => source,
     sequenceNumber: () => '0',
     incrementSequenceNumber: () => {},
   } as any;
-  const tx = new TransactionBuilder(source, {
+  const tx = new TransactionBuilder(src, {
     fee: BASE_FEE,
     networkPassphrase: NETWORK_PASSPHRASE,
   })
@@ -116,7 +120,7 @@ export async function fetchVaultAccount(userAddress: string): Promise<VaultAccou
   const raw = await callView('get_account', [
     new Address(userAddress).toScVal(),
     usdcAsset(),
-  ]);
+  ], userAddress);
   // Option::None from the contract → account not created yet → zeroed.
   if (raw === null || raw === undefined) {
     return {
@@ -189,7 +193,7 @@ export interface UserConfig {
  * registered on-chain. Returns null if the wallet has no vault config yet.
  */
 export async function fetchUserConfig(userAddress: string): Promise<UserConfig | null> {
-  const raw = await callView('get_user_config', [new Address(userAddress).toScVal()]);
+  const raw = await callView('get_user_config', [new Address(userAddress).toScVal()], userAddress);
   if (raw === null || raw === undefined) return null;
   return {
     orchestrator: raw.orchestrator ?? null,
