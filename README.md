@@ -15,11 +15,23 @@
 
 ## What it is
 
-CleverCon is payment infrastructure for AI agents on Stellar. It lets you hand an agent a budget it can spend on its own, while a smart contract holds the money and enforces the rules. The agent can pay for the data, compute, and services it needs to do real work, but it never holds your funds and never spends outside what you allowed.
+CleverCon is payment infrastructure for AI agents on Stellar. You hand an agent a budget, a non-custodial smart contract holds the money and enforces the limit, and the agent pays for the data, compute, and services it needs to do real work. It never holds your funds and never spends outside what you set.
 
-You deposit USDC into CleverVault, a non-custodial Soroban contract, and set a spending budget. The agent pays for services in USDC as it works, the contract caps the total at what you approved, and unused budget is refunded. The operator never touches your money, and every payment is a real Stellar transaction.
+Two things define it. The differentiator is **privacy**: the spending rules are enforced on-chain but kept private. And it is not just a protocol, it is a **live marketplace** you can use today.
 
-The direction the project is built toward is privacy. Most agent-payment tools put your budget, your approved payees, and every payment on a public ledger for anyone to read. CleverCon is designed so the enforcement stays on-chain while the rules stay yours: a spending policy the contract checks without revealing it, and a proof that spending followed the policy without exposing the amounts or counterparties. That work builds on the zero-knowledge engine that already runs on Stellar testnet as [CipherMit](https://github.com/Bosun-Josh121/ciphermit).
+## The marketplace
+
+The part people actually touch. Connect a wallet, fund a non-custodial vault, and hire from an open marketplace of services that spans automated AI agents, human specialists, and business services, across categories like Data and Oracles, AI and Analysis, Web and Research, Finance and DeFi, Risk and Compliance, Human Services, and Business Services. Search, filter by category, and sort by rating, usage, price, or speed.
+
+The vault holds the funds and releases payment per step, so the platform never has custody, and any HTTP service with a Stellar wallet and x402 or MPP support can register and earn. On testnet today you can connect a wallet, add USDC, deposit into the vault, check your balance, and browse the marketplace. The reference catalog shows the range of services the network is built for, and the registry is open for real providers to join.
+
+## Privacy, the differentiator
+
+Most agent-payment tools put your budget, your approved payees, and every payment on a public ledger for anyone to read. CleverCon is built so enforcement stays on-chain while the rules stay yours: a spending policy the contract checks without revealing it, and a proof that spending followed the policy without exposing amounts or counterparties. That is what separates it from transparent, custodial, or SDK-only alternatives. It builds on the zero-knowledge engine already running on Stellar testnet as [CipherMit](https://github.com/Bosun-Josh121/ciphermit), and bringing it into CleverVault is the core of the roadmap.
+
+## For builders: SDK and MCP
+
+CleverCon is also infrastructure others build on. A reusable SDK lets any app or agent embed safe, private spending in a few calls, and a Stellar MCP server lets any AI agent discover and pay for services under a policy natively. These make the rail composable, not just a destination app. Both are on the roadmap.
 
 ## How it works
 
@@ -33,16 +45,12 @@ The full fund-flow sequence and trust model are in [docs/architecture.md](docs/a
 ## What runs today
 
 - **CleverVault**, a non-custodial Soroban contract on testnet: deposits, budget locking, per-step release, refunds, multi-asset support, and admin controls, with a 100+ case test suite.
-- **Direct on-chain interaction from the browser**: connect a wallet, add a USDC trustline, deposit, check balance, and withdraw, all signed in your wallet and settled against the contract with no server in the middle.
-- **Orchestrator and open registry**: an orchestrator that plans work and hires specialist services, and a registry any HTTP service with a Stellar wallet and x402 or MPP support can join.
-- **x402 and MPP payments** to specialist services.
+- **A usable dApp**: connect a wallet, add a USDC trustline, deposit, check balance, and withdraw, all signed in your wallet and settled directly against the contract with no server in the middle.
+- **The marketplace**: browse, search, filter, and sort a catalog of services across seven categories and three provider types.
+- **Orchestrator and open registry**, with **x402 and MPP payments** to services.
 - Placed 2nd in the Stellar Agents hackathon.
 
-## Where it is going
-
-- **Private spending policies**: a spending rule the contract enforces on every payment without making the rule public, using zero-knowledge proofs, built on the CipherMit engine.
-- **Provable compliance**: a proof that all spending followed the policy, shareable with an auditor or partner without revealing the policy.
-- **An on-chain registry**, a **Stellar MCP server** so any agent can pay for services under a policy, and a **reusable SDK**.
+Roadmap: the private spending policies described above (from the CipherMit engine), an on-chain registry, the SDK, and the MCP server.
 
 ## Project structure
 

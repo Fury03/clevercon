@@ -7,10 +7,18 @@ agent a budget, a non-custodial Soroban vault holds the money and enforces the
 limit, and the agent pays for the services it needs in USDC without ever holding
 your funds or spending outside what you allowed.
 
-The direction the project is built toward is privacy. Today the vault enforces a
-budget in the open. The work ahead is a spending policy the contract enforces
-without making it public, and a proof that spending followed the policy without
-revealing it, built on the CipherMit zero-knowledge engine.
+The project has three layers. **Privacy** is the differentiator: spending rules
+enforced on-chain but kept private, the thing that separates CleverCon from
+transparent, custodial, or SDK-only alternatives. The **marketplace** is the
+live application: a usable dApp where you fund a non-custodial vault and hire
+services spanning AI agents, human specialists, and business services. The
+**SDK and MCP server** are the reach, letting other apps and agents embed the
+rail rather than only visiting it.
+
+Today the vault enforces a budget in the open. The work ahead is the privacy
+layer: a spending policy the contract enforces without making it public, and a
+proof that spending followed the policy without revealing it, built on the
+CipherMit zero-knowledge engine.
 
 The current service network is AI-focused, but the protocol is not tied to AI.
 Any HTTP service with a Stellar wallet and x402 or MPP support can register.
