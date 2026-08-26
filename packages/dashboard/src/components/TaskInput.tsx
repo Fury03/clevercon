@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Sparkles, Bot, Wallet, AlertTriangle, X } from 'lucide-react';
 import { useWallet } from '../contexts/WalletProvider';
 import { fetchVaultAccount } from '../lib/vault-client';
+import { BACKEND_ENABLED } from '../lib/config';
 
 interface Props {
   onSubmit: (task: string, budget: number) => void;
@@ -112,10 +113,15 @@ export function TaskInput({ onSubmit, isRunning, orchestratorName, onFundVault, 
   const balanceOk = !budgetValid || vaultAvailable === null || vaultAvailable >= budget;
 
   const handleSubmit = useCallback(() => {
-    if (!task.trim() || isRunning || !budgetValid) return;
-    if (vaultAvailable !== null && vaultAvailable < budget) {
-      setShowInsufficientModal(true);
-      return;
+    if (!task.trim() || isRunning) return;
+    // With no backend, a budget and balance check are moot (nothing dispatches),
+    // so let the prompt through and the app returns the offline message.
+    if (BACKEND_ENABLED) {
+      if (!budgetValid) return;
+      if (vaultAvailable !== null && vaultAvailable < budget) {
+        setShowInsufficientModal(true);
+        return;
+      }
     }
     onSubmit(task.trim(), budget);
     setTask('');
@@ -193,8 +199,8 @@ export function TaskInput({ onSubmit, isRunning, orchestratorName, onFundVault, 
             />
             <button
               onClick={handleSubmit}
-              disabled={!task.trim() || isRunning || !budgetValid}
-              title={!budgetValid ? 'Enter a budget first' : isRunning ? `${orchestratorName} is working on another task` : 'Send (⌘+Enter)'}
+              disabled={!task.trim() || isRunning || (BACKEND_ENABLED && !budgetValid)}
+              title={isRunning ? `${orchestratorName} is working on another task` : (BACKEND_ENABLED && !budgetValid) ? 'Enter a budget first' : 'Send (⌘+Enter)'}
               className="absolute bottom-2.5 right-2.5 w-7 h-7 flex items-center justify-center bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-600 text-white rounded-lg transition-all shadow-sm"
             >
               <Send size={12} />

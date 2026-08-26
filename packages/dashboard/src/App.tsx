@@ -150,10 +150,10 @@ function Dashboard() {
   const doSubmit = useCallback(async (task: string, budget: number, queueItemId?: string) => {
     if (!BACKEND_ENABLED) {
       addToast(
-        `${orchestrator?.name ?? 'The orchestrator'} is temporarily offline. Your request could not be dispatched right now, please try again later.`,
+        `${orchestrator?.name ?? 'Your agent'} is temporarily offline and can't take on tasks right now. Please try again a little later.`,
         'warning',
       );
-      if (queueItemId) advanceQueue(queueItemId, 'Orchestrator offline');
+      if (queueItemId) advanceQueue(queueItemId, 'Agent offline');
       return;
     }
     setIsRunning(true);
