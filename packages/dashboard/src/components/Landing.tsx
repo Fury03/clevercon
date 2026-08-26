@@ -80,6 +80,21 @@ const STEPS = [
   { icon: Lock, title: 'Stay in control', body: 'The platform never holds your money, and your spending rules stay private.' },
 ];
 
+type OfferStatus = 'live' | 'dev' | 'planned';
+const OFFERINGS: { icon: typeof Wallet; name: string; status: OfferStatus; body: string }[] = [
+  { icon: Wallet, name: 'Non-custodial vault', status: 'live', body: 'Fund a Soroban contract and spend under a budget it enforces. The platform never holds your money.' },
+  { icon: Store, name: 'Services marketplace', status: 'live', body: 'Hire AI agents, human specialists, and business services, paid in USDC over x402 and MPP.' },
+  { icon: Shield, name: 'Private spending policies', status: 'dev', body: 'Spending rules enforced on-chain but kept private, with proof of compliance. Built on zero-knowledge.' },
+  { icon: Boxes, name: 'Agent SDK', status: 'planned', body: 'Embed safe, private spending into any app or agent in a few lines of code.' },
+  { icon: Layers, name: 'Stellar MCP server', status: 'planned', body: 'Let any AI agent discover and pay for services under a policy, natively over MCP.' },
+  { icon: Sparkles, name: 'On-chain registry', status: 'planned', body: 'Verifiable service discovery and reputation, stored on Soroban.' },
+];
+const STATUS: Record<OfferStatus, { label: string; cls: string }> = {
+  live: { label: 'Live', cls: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' },
+  dev: { label: 'In development', cls: 'bg-violet-500/10 text-violet-300 border-violet-500/25' },
+  planned: { label: 'Planned', cls: 'bg-white/5 text-slate-400 border-white/10' },
+};
+
 export function Landing({ onLaunch }: { onLaunch: () => void }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -105,7 +120,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
         <nav className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
           <Logo />
           <div className="hidden md:flex items-center gap-7 text-sm text-slate-400">
-            <a href="#pillars" className="hover:text-white transition-colors">Product</a>
+            <a href="#platform" className="hover:text-white transition-colors">Product</a>
             <a href="#marketplace" className="hover:text-white transition-colors">Marketplace</a>
             <a href="#how" className="hover:text-white transition-colors">How it works</a>
             <a href="#privacy" className="hover:text-white transition-colors">Privacy</a>
@@ -159,7 +174,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
           </Reveal>
           <Reveal delay={320}>
             <div className="mt-10 flex items-center justify-center gap-x-6 gap-y-2 flex-wrap text-xs text-slate-500">
-              {['Non-custodial', 'Stellar Testnet', 'Open source (MIT)', '2nd place, Stellar Agents hackathon'].map((t) => (
+              {['Non-custodial', 'Stellar Testnet', 'USDC settlement', 'Private by design'].map((t) => (
                 <span key={t} className="inline-flex items-center gap-1.5">
                   <CheckCircle2 size={12} className="text-emerald-500/80" /> {t}
                 </span>
@@ -194,6 +209,37 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
                 </div>
               </Reveal>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Everything CleverCon offers */}
+      <section id="platform" className="px-5 py-20 border-t border-white/5">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center max-w-2xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight text-balance">
+              Everything CleverCon offers
+            </h2>
+            <p className="mt-3 text-slate-400">The vault and marketplace are live today. The rest is on the way, built in the open.</p>
+          </Reveal>
+          <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {OFFERINGS.map((o, i) => {
+              const st = STATUS[o.status];
+              return (
+                <Reveal key={o.name} delay={(i % 3) * 80}>
+                  <div className="h-full rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                        <o.icon size={17} className="text-slate-300" />
+                      </div>
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full border ${st.cls}`}>{st.label}</span>
+                    </div>
+                    <h3 className="mt-4 text-base font-semibold text-white">{o.name}</h3>
+                    <p className="mt-1.5 text-sm text-slate-400 leading-relaxed">{o.body}</p>
+                  </div>
+                </Reveal>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -337,7 +383,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
           </div>
         </div>
         <p className="max-w-6xl mx-auto mt-6 text-xs text-slate-700">
-          CleverCon is open-source software under the MIT license. On testnet, all assets are test assets with no real-world value.
+          On Stellar testnet, all assets are test assets with no real-world value.
         </p>
       </footer>
     </div>
