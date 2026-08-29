@@ -155,4 +155,107 @@ describe('createMockVaultClient', () => {
     await mock.mockCreateTask(orch, 5);
     expect(await mock.taskCount()).toBe(2n);
   });
+
+  it('mockCompleteTask marks task done and unlocks budget', async () => {
+    const mock = createMockVaultClient();
+    const user = 'GAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+    const orch = 'GCCCCCCCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+    await mock.mockRegisterOrchestrator(user, orch, 'TestOrch');
+    await mock.mockDeposit(user, 100);
+    const taskId = await mock.mockCreateTask(orch, 10);
+
+    const taskBefore = await mock.getTask(taskId);
+    expect(taskBefore?.completed).toBe(false);
+
+    await mock.mockCompleteTask(orch, taskId);
+
+    const taskAfter = await mock.getTask(taskId);
+    expect(taskAfter?.completed).toBe(true);
+
+    // Budget was locked at 10 USDC = 100_000_000 stroops
+    // With 0 spent, balance should go from 100 USDC to 100 USDC (locked released, no spend deducted)
+    const acct = await mock.getAccount(user);
+    expect(acct?.locked).toBe(0n);
+  });
+
+  it('mockCompleteTask throws TaskNotFound for unknown task', async () => {
+    const mock = createMockVaultClient();
+    const orch = 'GCCCCCCCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+    await expect(mock.mockCompleteTask(orch, 999n)).rejects.toThrow(VaultContractError);
+  });
+
+  it('mockCompleteTask throws TaskAlreadyCompleted for completed task', async () => {
+    const mock = createMockVaultClient();
+    const user = 'GAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+    const orch = 'GCCCCCCCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+    await mock.mockRegisterOrchestrator(user, orch, 'TestOrch');
+    await mock.mockDeposit(user, 100);
+    const taskId = await mock.mockCreateTask(orch, 10);
+    await mock.mockCompleteTask(orch, taskId);
+    await expect(mock.mockCompleteTask(orch, taskId)).rejects.toThrow(VaultContractError);
+  });
+
+  it('mockCancelTask marks task done and unlocks budget', async () => {
+    const mock = createMockVaultClient();
+    const user = 'GAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+    const orch = 'GCCCCCCCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+    await mock.mockRegisterOrchestrator(user, orch, 'TestOrch');
+    await mock.mockDeposit(user, 100);
+    const taskId = await mock.mockCreateTask(orch, 10);
+
+    await mock.mockCancelTask(user, taskId);
+    const task = await mock.getTask(taskId);
+    expect(task?.completed).toBe(true);
+  });
+
+  it('mockCancelTask throws NotYourTask for wrong user', async () => {
+    const mock = createMockVaultClient();
+    const user = 'GAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+    const orch = 'GCCCCCCCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+    await mock.mockRegisterOrchestrator(user, orch, 'TestOrch');
+    await mock.mockDeposit(user, 100);
+    const taskId = await mock.mockCreateTask(orch, 10);
+
+    await expect(mock.mockCancelTask('GZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ', taskId)).rejects.toThrow(VaultContractError);
+  });
+
+  it('getUserTasks returns task IDs for a user', async () => {
+    const mock = createMockVaultClient();
+    const user = 'GAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+    const orch = 'GCCCCCCCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+    await mock.mockRegisterOrchestrator(user, orch, 'TestOrch');
+    await mock.mockDeposit(user, 100);
+
+    expect(await mock.getUserTasks(user)).toEqual([]);
+    const id1 = await mock.mockCreateTask(orch, 10);
+    const id2 = await mock.mockCreateTask(orch, 5);
+    const tasks = await mock.getUserTasks(user);
+    expect(tasks).toContain(id1);
+    expect(tasks).toContain(id2);
+  });
+
+  it('isSupportedAsset returns true for MOCK_ASSET', async () => {
+    const mock = createMockVaultClient();
+    expect(await mock.isSupportedAsset('DCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC')).toBe(true);
+    expect(await mock.isSupportedAsset('GUNKNOWN')).toBe(false);
+  });
+
+  it('isPaused returns false by default', async () => {
+    const mock = createMockVaultClient();
+    expect(await mock.isPaused()).toBe(false);
+  });
+
+  it('getAvailable returns balance minus locked', async () => {
+    const mock = createMockVaultClient();
+    const user = 'GAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+    const orch = 'GCCCCCCCDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+    await mock.mockRegisterOrchestrator(user, orch, 'TestOrch');
+    await mock.mockDeposit(user, 100);
+    const available1 = await mock.getAvailable(user);
+    expect(available1).toBe(1_000_000_000n);
+
+    await mock.mockCreateTask(orch, 10);
+    const available2 = await mock.getAvailable(user);
+    expect(available2).toBe(900_000_000n);
+  });
 });

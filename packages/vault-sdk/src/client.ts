@@ -286,12 +286,47 @@ export class VaultClient {
   }
 
   /**
+   * Build unsigned `update_orchestrator` XDR for the user to sign.
+   */
+  async buildUpdateOrchestratorXdr(
+    userAddress: string,
+    newOrchestratorAddress: string,
+    name: string,
+  ): Promise<string> {
+    return this.buildUnsignedXdr(userAddress, 'update_orchestrator', [
+      new Address(userAddress).toScVal(),
+      new Address(newOrchestratorAddress).toScVal(),
+      nativeToScVal(name, { type: 'string' }),
+    ]);
+  }
+
+  /**
    * Build unsigned `cancel_task` XDR for the user to sign.
    */
   async buildCancelTaskXdr(userAddress: string, taskId: bigint): Promise<string> {
     return this.buildUnsignedXdr(userAddress, 'cancel_task', [
       new Address(userAddress).toScVal(),
       nativeToScVal(taskId, { type: 'u64' }),
+    ]);
+  }
+
+  /**
+   * Build unsigned `raise_dispute` XDR for the user to sign.
+   */
+  async buildRaiseDisputeXdr(userAddress: string, taskId: bigint): Promise<string> {
+    return this.buildUnsignedXdr(userAddress, 'raise_dispute', [
+      new Address(userAddress).toScVal(),
+      nativeToScVal(taskId, { type: 'u64' }),
+    ]);
+  }
+
+  /**
+   * Build unsigned `claim_fees` XDR for the fee recipient to sign.
+   */
+  async buildClaimFeesXdr(recipientAddress: string, assetAddress: string): Promise<string> {
+    return this.buildUnsignedXdr(recipientAddress, 'claim_fees', [
+      new Address(recipientAddress).toScVal(),
+      new Address(assetAddress).toScVal(),
     ]);
   }
 

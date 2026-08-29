@@ -216,6 +216,42 @@ export function createMockVaultClient(overrides?: Partial<MockState>) {
       acct.orchestrator_name = name;
     },
 
+    /** Complete a task — marks it done, unlocks budget minus spent. */
+    async mockCompleteTask(orchestratorAddress: string, taskId: bigint): Promise<void> {
+      const task = state.tasks.get(taskId);
+      if (!task) throw new VaultContractError(8, { mock: true }); // TaskNotFound
+      if (task.completed) throw new VaultContractError(9, { mock: true }); // TaskAlreadyCompleted
+      if (task.orchestrator !== orchestratorAddress) throw new VaultContractError(17, { mock: true }); // NotYourOrchestrator
+
+      const owner = task.user;
+      const acct = state.userAccounts.get(owner);
+      if (acct) {
+        acct.locked -= task.plan_cost;
+        acct.balance -= task.spent;
+        acct.total_spent += task.spent;
+        acct.active_tasks_count -= 1;
+      }
+      task.completed = true;
+    },
+
+    /** Cancel a task — unlocks full budget. */
+    async mockCancelTask(userAddress: string, taskId: bigint): Promise<void> {
+      const task = state.tasks.get(taskId);
+      if (!task) throw new VaultContractError(8, { mock: true }); // TaskNotFound
+      if (task.completed) throw new VaultContractError(9, { mock: true }); // TaskAlreadyCompleted
+      if (task.user !== userAddress) throw new VaultContractError(16, { mock: true }); // NotYourTask
+      if (task.disputed) throw new VaultContractError(19, { mock: true }); // TaskDisputed
+
+      const acct = state.userAccounts.get(userAddress);
+      if (acct) {
+        acct.locked -= task.plan_cost;
+        acct.balance -= task.spent;
+        acct.total_spent += task.spent;
+        acct.active_tasks_count -= 1;
+      }
+      task.completed = true;
+    },
+
     /** Access internal state for assertions in tests. */
     _state: state,
   };
