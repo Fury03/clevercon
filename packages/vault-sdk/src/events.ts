@@ -5,7 +5,7 @@
  * management, gaps, and duplicate detection.
  */
 
-import { rpc as SorobanRpc, xdr, Address } from '@stellar/stellar-sdk';
+import { rpc as SorobanRpc, scValToNative, xdr } from '@stellar/stellar-sdk';
 import type {
   VaultEvent,
   DepositEventPayload,
@@ -49,7 +49,7 @@ function parseEventPayload(
   data: xdr.ScVal,
 ): VaultEvent | null {
   try {
-    const native = xdr.scValToNative(data) as any;
+    const native = scValToNative(data) as any;
     switch (eventType) {
       case 'deposit':
         return { type: 'deposit', payload: { user: String(native.user), asset: String(native.asset), amount: BigInt(native.amount) } as DepositEventPayload };
@@ -84,6 +84,18 @@ function parseEventPayload(
       default:
         return null;
     }
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract the event topic name string from an ScVal.
+ * Uses scValToNative for symbols/strings.
+ */
+function extractTopicName(topicVal: xdr.ScVal): string | null {
+  try {
+    return String(scValToNative(topicVal));
   } catch {
     return null;
   }
@@ -129,34 +141,31 @@ export function subscribeEvents(
   const poll = async () => {
     while (!stopped) {
       try {
-        const response = await server.getEvents({
-          contractIds: [options.contractId],
-          startLedger: cursor ? undefined : undefined,
-          cursor,
-          limit: 100,
-        });
+        const request: SorobanRpc.Api.GetEventsRequest = cursor
+          ? {
+              filters: [{ type: 'contract', contractIds: [options.contractId] }],
+              cursor,
+              limit: 100,
+            }
+          : {
+              filters: [{ type: 'contract', contractIds: [options.contractId] }],
+              startLedger: 1,
+              limit: 100,
+            };
+
+        const response = await server.getEvents(request);
 
         for (const event of response.events) {
-          const txHash = event.txHash ?? '';
+          const txHash = event.id ?? '';
           if (seen.has(txHash)) continue;
           seen.add(txHash);
 
-          // Extract event type from topics
-          const topics = event.topics;
+          // Extract event type from topics (singular — EventResponse.topic)
+          const topics = event.topic;
           if (!topics || topics.length === 0) continue;
 
-          let topicStr: string;
-          try {
-            topicStr = xdr.ScVal.scvSymbol(options.topics?.[0] ?? '').toBuffer().toString();
-          } catch {
-            // fallback: try to read the raw string from the ScVal
-            try {
-              const topicNative = xdr.scValToNative(topics[0]);
-              topicStr = String(topicNative);
-            } catch {
-              continue;
-            }
-          }
+          const topicStr = extractTopicName(topics[0]);
+          if (!topicStr) continue;
 
           const eventType = EVENT_TOPIC_MAP[topicStr];
           if (!eventType) continue;
@@ -205,24 +214,27 @@ export async function fetchEvents(
 ): Promise<{ events: VaultEvent[]; cursor?: string }> {
   const server = new SorobanRpc.Server(rpcUrl, { allowHttp: false });
 
-  const response = await server.getEvents({
-    contractIds: [contractId],
-    cursor: options?.cursor,
-    limit: options?.limit ?? 100,
-  });
+  const request: SorobanRpc.Api.GetEventsRequest = options?.cursor
+    ? {
+        filters: [{ type: 'contract', contractIds: [contractId] }],
+        cursor: options.cursor,
+        limit: options?.limit ?? 100,
+      }
+    : {
+        filters: [{ type: 'contract', contractIds: [contractId] }],
+        startLedger: 1,
+        limit: options?.limit ?? 100,
+      };
+
+  const response = await server.getEvents(request);
 
   const events: VaultEvent[] = [];
   for (const event of response.events) {
-    const topics = event.topics;
+    const topics = event.topic;
     if (!topics || topics.length === 0) continue;
 
-    let topicStr: string;
-    try {
-      const topicNative = xdr.scValToNative(topics[0]);
-      topicStr = String(topicNative);
-    } catch {
-      continue;
-    }
+    const topicStr = extractTopicName(topics[0]);
+    if (!topicStr) continue;
 
     const eventType = EVENT_TOPIC_MAP[topicStr];
     if (!eventType) continue;
